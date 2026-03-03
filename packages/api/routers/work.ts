@@ -15,6 +15,18 @@ export const workRouter = createTRPCRouter({
   list: publicProcedure
     .input(z.object({ identityId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      // Respect the identity's visibility setting: private identities' works
+      // must not be returned to unauthenticated or unconnected callers.
+      const [identity] = await ctx.db
+        .select({ visibility: identities.visibility, deletedAt: identities.deletedAt })
+        .from(identities)
+        .where(eq(identities.id, input.identityId))
+        .limit(1);
+
+      if (!identity || identity.deletedAt !== null || identity.visibility === 'private') {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
+
       const workList = await ctx.db
         .select()
         .from(works)
@@ -34,6 +46,17 @@ export const workRouter = createTRPCRouter({
         .limit(1);
 
       if (!work) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      // Respect the creator identity's visibility setting.
+      const [creator] = await ctx.db
+        .select({ visibility: identities.visibility, deletedAt: identities.deletedAt })
+        .from(identities)
+        .where(eq(identities.id, work.createdBy!))
+        .limit(1);
+
+      if (!creator || creator.deletedAt !== null || creator.visibility === 'private') {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
 
       const credits = await ctx.db
         .select({
@@ -185,6 +208,15 @@ export const workRouter = createTRPCRouter({
 
       if (!work) throw new TRPCError({ code: 'NOT_FOUND' });
       if (work.createdBy !== ctx.identity.id) throw new TRPCError({ code: 'FORBIDDEN' });
+
+      // Prevent removing the creator's own credit — a work must always have at
+      // least one credited identity.
+      if (credit.identityId === work.createdBy) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot remove the creator credit. Transfer work ownership first.',
+        });
+      }
 
       await ctx.db.delete(workCredits).where(eq(workCredits.id, input.creditId));
 

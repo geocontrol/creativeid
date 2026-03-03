@@ -8,10 +8,27 @@ const ratelimit = new Ratelimit({
   analytics: false,
 });
 
+/**
+ * Extract the real client IP, preferring platform-specific trusted headers
+ * over the spoofable x-forwarded-for value.
+ * Cloudflare → cf-connecting-ip
+ * Vercel / nginx → x-real-ip
+ * Generic proxy → first value of x-forwarded-for (only reliable behind a
+ *   trusted reverse proxy that strips the header on ingress)
+ */
+function getClientIp(req: NextRequest): string {
+  return (
+    req.headers.get('cf-connecting-ip') ??
+    req.headers.get('x-real-ip') ??
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    '127.0.0.1'
+  );
+}
+
 export async function checkRateLimit(req: NextRequest): Promise<
   { success: true } | { success: false; response: Response }
 > {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
+  const ip = getClientIp(req);
   const { success, limit, reset, remaining } = await ratelimit.limit(ip);
 
   if (!success) {

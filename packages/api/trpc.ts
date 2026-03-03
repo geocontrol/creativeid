@@ -9,19 +9,45 @@ import { timingSafeEqual } from 'crypto';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-// ─── Per-user rate limiter ─────────────────────────────────────────────────────
-// Optional: skipped in environments where Upstash env vars are not configured
-// (e.g. local dev without Redis). Set to 120 calls/min per authenticated user.
+// ─── IP extraction helper ──────────────────────────────────────────────────────
+// Prefer platform-specific trusted headers to avoid x-forwarded-for spoofing
+// when the app is not behind a trusted reverse proxy.
 
-const mutationRatelimit =
-  process.env['UPSTASH_REDIS_REST_URL'] && process.env['UPSTASH_REDIS_REST_TOKEN']
-    ? new Ratelimit({
-        redis: Redis.fromEnv(),
-        limiter: Ratelimit.slidingWindow(120, '1 m'),
-        analytics: false,
-        prefix: 'trpc',
-      })
-    : null;
+function getClientIp(headers: Headers): string {
+  return (
+    headers.get('cf-connecting-ip') ??   // Cloudflare
+    headers.get('x-real-ip') ??          // Vercel / nginx
+    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    '127.0.0.1'
+  );
+}
+
+// ─── Rate limiters ────────────────────────────────────────────────────────────
+// Optional: skipped in environments where Upstash env vars are not configured.
+
+const upstashConfigured =
+  Boolean(process.env['UPSTASH_REDIS_REST_URL']) &&
+  Boolean(process.env['UPSTASH_REDIS_REST_TOKEN']);
+
+// 120 calls/min per authenticated user (mutations)
+const mutationRatelimit = upstashConfigured
+  ? new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(120, '1 m'),
+      analytics: false,
+      prefix: 'trpc:authed',
+    })
+  : null;
+
+// 150 calls/min per IP for unauthenticated public procedures
+const publicRatelimit = upstashConfigured
+  ? new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(150, '1 m'),
+      analytics: false,
+      prefix: 'trpc:public',
+    })
+  : null;
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -41,13 +67,47 @@ const t = initTRPC.context<Context>().create({
 });
 
 export const createTRPCRouter = t.router;
-export const publicProcedure = t.procedure;
+
+// ─── Public rate-limit middleware ─────────────────────────────────────────────
+
+const enforcePublicRateLimit = t.middleware(async ({ ctx, next }) => {
+  if (publicRatelimit) {
+    const ip = getClientIp(ctx.headers);
+    const { success } = await publicRatelimit.limit(ip);
+    if (!success) {
+      throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Too many requests. Please slow down.' });
+    }
+  }
+  return next({ ctx });
+});
+
+export const publicProcedure = t.procedure.use(enforcePublicRateLimit);
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
 const enforceUserIsAuthed = t.middleware(async ({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+
+  // CSRF check: reject cross-origin authenticated requests. Server-side calls
+  // (no Origin header) are always allowed.
+  const origin = ctx.headers.get('origin');
+  if (origin) {
+    const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? '';
+    let allowed: string;
+    try {
+      allowed = new URL(appUrl).origin;
+    } catch {
+      // Malformed APP_URL — block in production, skip in dev.
+      if (process.env['NODE_ENV'] === 'production') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'CSRF validation failed.' });
+      }
+      allowed = '';
+    }
+    if (allowed && origin !== allowed) {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'CSRF validation failed.' });
+    }
   }
 
   // Per-user rate limiting — enforced when Upstash is configured.

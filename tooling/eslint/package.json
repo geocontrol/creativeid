@@ -1,0 +1,13 @@
+{
+  "name": "@creativeid/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "files": ["index.js", "next.js"],
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint-plugin-react": "^7.34.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-config-next": "14.2.3"
+  }
+}

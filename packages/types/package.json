@@ -1,0 +1,19 @@
+{
+  "name": "@creativeid/types",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8",
+    "nanoid": "^5.0.7"
+  },
+  "devDependencies": {
+    "@creativeid/tsconfig": "workspace:*",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@creativeid/db",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./index.ts",
+    "./schema": "./schema/index.ts"
+  },
+  "scripts": {
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.4",
+    "drizzle-orm": "^0.30.10"
+  },
+  "devDependencies": {
+    "@creativeid/tsconfig": "workspace:*",
+    "drizzle-kit": "^0.21.4",
+    "typescript": "^5.4.5"
+  }
+}

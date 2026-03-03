@@ -1,0 +1,23 @@
+{
+  "name": "@creativeid/api",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^5.2.0",
+    "@creativeid/db": "workspace:*",
+    "@creativeid/types": "workspace:*",
+    "@trpc/server": "^11.0.0",
+    "drizzle-orm": "^0.30.10",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@creativeid/tsconfig": "workspace:*",
+    "typescript": "^5.4.5"
+  }
+}

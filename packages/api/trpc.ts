@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@creativeid/db';
 import { identities } from '@creativeid/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import superjson from 'superjson';
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -16,7 +17,9 @@ export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 // ─── tRPC initialisation ─────────────────────────────────────────────────────
 
-const t = initTRPC.context<Context>().create();
+const t = initTRPC.context<Context>().create({
+  transformer: superjson,
+});
 
 export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;

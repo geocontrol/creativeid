@@ -66,12 +66,14 @@ export const identityRouter = createTRPCRouter({
   search: publicProcedure
     .input(z.object({ query: z.string().min(1).max(100) }))
     .query(async ({ ctx, input }) => {
+      // Escape SQL wildcard characters to prevent pattern-based DoS.
+      const escaped = input.query.replace(/[%_\\]/g, '\\$&');
       const results = await ctx.db
         .select()
         .from(identities)
         .where(
           and(
-            ilike(identities.displayName, `%${input.query}%`),
+            ilike(identities.displayName, `%${escaped}%`),
             isNull(identities.deletedAt),
             eq(identities.visibility, 'public'),
           ),
@@ -152,13 +154,22 @@ export const identityRouter = createTRPCRouter({
         throw new TRPCError({ code: 'CONFLICT', message: 'This handle is already taken.' });
       }
 
-      const [updated] = await ctx.db
-        .update(identities)
-        .set({ handle: input.handle, updatedAt: new Date() })
-        .where(eq(identities.id, ctx.identity.id))
-        .returning();
-
-      return updated!;
+      try {
+        const [updated] = await ctx.db
+          .update(identities)
+          .set({ handle: input.handle, updatedAt: new Date() })
+          .where(eq(identities.id, ctx.identity.id))
+          .returning();
+        return updated!;
+      } catch (err: unknown) {
+        // Postgres unique_violation — two concurrent requests raced past the
+        // uniqueness check above; the DB constraint caught it.
+        const pgCode = (err as { cause?: { code?: string } })?.cause?.code;
+        if (pgCode === '23505') {
+          throw new TRPCError({ code: 'CONFLICT', message: 'This handle is already taken.' });
+        }
+        throw err;
+      }
     }),
 
   /** Mutation: publish profile — generate and store content_hash. */

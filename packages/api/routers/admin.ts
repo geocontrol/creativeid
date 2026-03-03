@@ -9,12 +9,10 @@ import { z } from 'zod';
 import { identities } from '@creativeid/db/schema';
 import { createTRPCRouter, adminProcedure } from '../trpc';
 
-const adminInputBase = z.object({ adminSecret: z.string() });
-
 export const adminRouter = createTRPCRouter({
   /** Move a handle from one identity to another. */
   reassignHandle: adminProcedure
-    .input(adminInputBase.extend({
+    .input(z.object({
       fromIdentityId: z.string().uuid(),
       toIdentityId: z.string().uuid(),
     }))
@@ -46,7 +44,7 @@ export const adminRouter = createTRPCRouter({
 
   /** Remove a handle from an identity, returning it to unclaimed. */
   clearHandle: adminProcedure
-    .input(adminInputBase.extend({ identityId: z.string().uuid() }))
+    .input(z.object({ identityId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [identity] = await ctx.db
         .select()

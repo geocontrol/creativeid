@@ -4,6 +4,7 @@ import { workRouter } from './routers/work';
 import { connectionRouter } from './routers/connection';
 import { groupRouter } from './routers/group';
 import { adminRouter } from './routers/admin';
+import { reportRouter } from './routers/report';
 
 export { createTRPCContext } from './trpc';
 
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
   connection: connectionRouter,
   group: groupRouter,
   admin: adminRouter,
+  report: reportRouter,
 });
 
 export type AppRouter = typeof appRouter;

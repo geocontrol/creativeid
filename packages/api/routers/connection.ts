@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { eq, and, or, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { connections, identities } from '@creativeid/db/schema';
 import { requestConnectionSchema, respondConnectionSchema } from '@creativeid/types';
@@ -46,6 +46,7 @@ export const connectionRouter = createTRPCRouter({
               eq(connections.fromId, input.identityId),
               eq(connections.toId, input.identityId),
             ),
+            isNull(identities.deletedAt),
           ),
         );
 
@@ -78,6 +79,7 @@ export const connectionRouter = createTRPCRouter({
         and(
           eq(connections.toId, ctx.identity.id),
           eq(connections.status, 'pending'),
+          isNull(identities.deletedAt),
         ),
       );
 
@@ -128,16 +130,19 @@ export const connectionRouter = createTRPCRouter({
 
       if (!connection) throw new TRPCError({ code: 'NOT_FOUND' });
 
-      await ctx.db
-        .update(connections)
-        .set({ status: 'accepted', updatedAt: new Date() })
-        .where(eq(connections.id, input.connectionId));
+      // Wrap status update and counter increments in a transaction so a partial
+      // failure cannot leave connection_count inconsistent with connection status.
+      await ctx.db.transaction(async (tx) => {
+        await tx
+          .update(connections)
+          .set({ status: 'accepted', updatedAt: new Date() })
+          .where(eq(connections.id, input.connectionId));
 
-      // Increment connection_count for both parties (denormalised for web-of-trust)
-      await ctx.db
-        .update(identities)
-        .set({ connectionCount: sql`${identities.connectionCount} + 1` })
-        .where(or(eq(identities.id, connection.fromId), eq(identities.id, connection.toId)));
+        await tx
+          .update(identities)
+          .set({ connectionCount: sql`${identities.connectionCount} + 1` })
+          .where(or(eq(identities.id, connection.fromId), eq(identities.id, connection.toId)));
+      });
 
       return { success: true };
     }),
@@ -193,13 +198,16 @@ export const connectionRouter = createTRPCRouter({
 
       if (!connection) throw new TRPCError({ code: 'NOT_FOUND' });
 
-      await ctx.db.delete(connections).where(eq(connections.id, input.connectionId));
+      // Wrap deletion and counter decrements in a transaction so a partial
+      // failure cannot leave connection_count inconsistent with connection status.
+      await ctx.db.transaction(async (tx) => {
+        await tx.delete(connections).where(eq(connections.id, input.connectionId));
 
-      // Decrement connection_count for both parties (minimum 0)
-      await ctx.db
-        .update(identities)
-        .set({ connectionCount: sql`GREATEST(${identities.connectionCount} - 1, 0)` })
-        .where(or(eq(identities.id, connection.fromId), eq(identities.id, connection.toId)));
+        await tx
+          .update(identities)
+          .set({ connectionCount: sql`GREATEST(${identities.connectionCount} - 1, 0)` })
+          .where(or(eq(identities.id, connection.fromId), eq(identities.id, connection.toId)));
+      });
 
       return { success: true };
     }),

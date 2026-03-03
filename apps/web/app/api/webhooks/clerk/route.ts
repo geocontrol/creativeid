@@ -38,30 +38,39 @@ export async function POST(req: Request) {
     return new Response('Invalid webhook signature', { status: 400 });
   }
 
-  // Handle events
+  // Handle events — DB operations are awaited so that failures return 500
+  // and Clerk retries delivery, rather than silently dropping the event.
   if (event.type === 'user.created') {
     const { id: clerkUserId } = event.data;
 
-    // Create identity stub — do not block response
-    void db.insert(identities).values({
-      ciid: generateCiid(),
-      clerkUserId,
-      displayName: event.data.first_name
-        ? `${event.data.first_name} ${event.data.last_name ?? ''}`.trim()
-        : 'New creator',
-      isPrimary: true,
-    });
+    try {
+      await db.insert(identities).values({
+        ciid: generateCiid(),
+        clerkUserId,
+        displayName: event.data.first_name
+          ? `${event.data.first_name} ${event.data.last_name ?? ''}`.trim()
+          : 'New creator',
+        isPrimary: true,
+      });
+    } catch (err) {
+      console.error('[clerk webhook] Failed to create identity stub:', err);
+      return new Response('Database error', { status: 500 });
+    }
   }
 
   if (event.type === 'user.deleted') {
     const { id: clerkUserId } = event.data;
     if (!clerkUserId) return new Response('OK');
 
-    // Soft-delete all identities for this user
-    void db
-      .update(identities)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(identities.clerkUserId, clerkUserId), isNull(identities.deletedAt)));
+    try {
+      await db
+        .update(identities)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(identities.clerkUserId, clerkUserId), isNull(identities.deletedAt)));
+    } catch (err) {
+      console.error('[clerk webhook] Failed to soft-delete identity:', err);
+      return new Response('Database error', { status: 500 });
+    }
   }
 
   return new Response('OK');

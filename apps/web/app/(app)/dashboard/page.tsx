@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@creativeid/db';
 import { identities, works } from '@creativeid/db/schema';
 import { eq, and, isNull, desc } from 'drizzle-orm';
+import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProfileCompleteness } from '@/components/ProfileCompleteness';
 import { WorkCard } from '@/components/WorkCard';
@@ -50,7 +51,9 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/profile/works/new">+ Add a work</Link>
+          <Link href="/profile/works/new" className="flex items-center gap-1.5">
+            <PlusCircle className="h-4 w-4" /> Add a work
+          </Link>
         </Button>
       </div>
 

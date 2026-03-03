@@ -1,13 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { workTypeValues } from '@creativeid/types';
 import { trpc } from '@/lib/trpc';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function NewWorkPage() {
   const router = useRouter();
@@ -20,15 +29,21 @@ export default function NewWorkPage() {
   const [url, setUrl] = useState('');
 
   const createWork = trpc.work.create.useMutation({
-    onSuccess: () => router.push('/profile'),
+    onSuccess: () => {
+      toast({ title: 'Work added', description: `"${title}" has been added to your profile.` });
+      router.push('/profile');
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate year is a plausible integer if provided
+    const parsedYear = year ? Number(year) : null;
+    if (year && (isNaN(parsedYear!) || !Number.isInteger(parsedYear))) return;
     createWork.mutate({
       title: title.trim(),
       workType,
-      year: year ? Number(year) : null,
+      year: parsedYear,
       role: role.trim(),
       roleNote: roleNote.trim() || null,
       description: description.trim() || null,
@@ -53,30 +68,29 @@ export default function NewWorkPage() {
 
         <div className="space-y-2">
           <Label htmlFor="workType">Type *</Label>
-          <select
-            id="workType"
-            value={workType}
-            onChange={(e) => setWorkType(e.target.value as typeof workType)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {workTypeValues.map((t) => (
-              <option key={t} value={t}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </option>
-            ))}
-          </select>
+          <Select value={workType} onValueChange={(v) => setWorkType(v as typeof workType)}>
+            <SelectTrigger id="workType">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {workTypeValues.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="year">Year</Label>
           <Input
             id="year"
-            type="number"
+            inputMode="numeric"
             value={year}
-            onChange={(e) => setYear(e.target.value)}
+            onChange={(e) => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
             placeholder="e.g. 2009"
-            min={1800}
-            max={new Date().getFullYear() + 5}
+            maxLength={4}
           />
         </div>
 
@@ -128,10 +142,14 @@ export default function NewWorkPage() {
         )}
 
         <div className="flex gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1">
-            Cancel
+          <Button type="button" variant="outline" className="flex-1" asChild>
+            <Link href="/profile">Cancel</Link>
           </Button>
-          <Button type="submit" disabled={!title.trim() || !role.trim() || createWork.isPending} className="flex-1">
+          <Button
+            type="submit"
+            disabled={!title.trim() || !role.trim() || createWork.isPending}
+            className="flex-1"
+          >
             {createWork.isPending ? 'Saving…' : 'Add work'}
           </Button>
         </div>

@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { type Metadata } from 'next';
 import Link from 'next/link';
@@ -12,18 +13,20 @@ interface Props {
   params: { handle: string };
 }
 
-async function getIdentity(handle: string) {
+// cache() deduplicates calls within the same request — generateMetadata and the
+// page component both call this, so without cache() we'd hit the DB twice.
+const getIdentity = cache(async (handle: string) => {
   const [identity] = await db
     .select()
     .from(identities)
-    .where(and(eq(identities.handle, handle), isNull(identities.deletedAt)))
+    .where(eq(identities.handle, handle))
     .limit(1);
-  return identity;
-}
+  return identity ?? null;
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const identity = await getIdentity(params.handle);
-  if (!identity) return { title: 'Not found' };
+  if (!identity || identity.deletedAt) return { title: 'Not found' };
 
   const description = identity.artistStatement ?? identity.biography?.slice(0, 160) ?? undefined;
 
@@ -49,14 +52,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicProfilePage({ params }: Props) {
   const identity = await getIdentity(params.handle);
 
+  // Handle not found — no identity with this handle at all
   if (!identity) notFound();
 
-  // 410 Gone for deleted identities — set status via route segment config
+  // 410 Gone — identity existed but has been deleted.
+  // Next.js App Router page components cannot set HTTP status directly; the 410
+  // status code is enforced by middleware (middleware.ts checks deletedAt and
+  // returns a 410 Response for deleted handles). This render path provides the
+  // correct UI for both the middleware response body and direct client navigation.
   if (identity.deletedAt) {
-    // Next.js App Router: we can't set HTTP status from a page component directly.
-    // Use notFound() and handle 410 via the not-found page, or use a Response.
-    // Best practice: trigger a not-found that the error boundary catches as 410.
-    // We signal 410 by rendering a specific message; middleware handles the status.
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -73,22 +77,22 @@ export default async function PublicProfilePage({ params }: Props) {
   // 404 for private profiles
   if (identity.visibility === 'private') notFound();
 
-  // Fetch works
-  const workList = await db
-    .select()
-    .from(works)
-    .where(and(eq(works.createdBy, identity.id), isNull(works.deletedAt)));
-
-  // Fetch accepted connections (both directions)
-  const connectionList = await db
-    .select()
-    .from(connections)
-    .where(
-      and(
-        eq(connections.status, 'accepted'),
-        or(eq(connections.fromId, identity.id), eq(connections.toId, identity.id)),
+  // Fetch works and connections in parallel — independent queries.
+  const [workList, connectionList] = await Promise.all([
+    db
+      .select()
+      .from(works)
+      .where(and(eq(works.createdBy, identity.id), isNull(works.deletedAt))),
+    db
+      .select()
+      .from(connections)
+      .where(
+        and(
+          eq(connections.status, 'accepted'),
+          or(eq(connections.fromId, identity.id), eq(connections.toId, identity.id)),
+        ),
       ),
-    );
+  ]);
 
   // Get the connected identities (the other side of each connection)
   const connectedIds = connectionList
@@ -123,6 +127,17 @@ export default async function PublicProfilePage({ params }: Props) {
           <Link href="/" className="text-sm font-semibold text-primary">
             creativeId
           </Link>
+          <nav className="flex items-center gap-3">
+            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">
+              Sign in
+            </Link>
+            <Link
+              href="/sign-up"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Create your creativeId
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -160,22 +175,37 @@ export default async function PublicProfilePage({ params }: Props) {
           </section>
         )}
 
-        <div className="mt-16 border-t pt-6 text-xs text-muted-foreground">
-          <p>CIID: {identity.ciid}</p>
-          {identity.contentHash && (
-            <p className="mt-1 font-mono">
-              Content hash: {identity.contentHash.slice(0, 20)}…
-            </p>
-          )}
-          <p className="mt-2">
-            <Link href={`/api/v1/identity/${identity.ciid}`} className="hover:underline">
-              View JSON API
-            </Link>
-            {' · '}
-            <Link href={`/api/v1/verify/${identity.ciid}`} className="hover:underline">
-              Verify profile
-            </Link>
-          </p>
+        <div className="mt-8">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-2 rounded-md border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+          >
+            Connect with {identity.displayName.split(' ')[0]}
+          </Link>
+        </div>
+
+        <div className="mt-16 border-t pt-6">
+          <details className="group">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground list-none flex items-center gap-1">
+              <span className="transition-transform group-open:rotate-90">▶</span>
+              Developer &amp; verification info
+            </summary>
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground font-mono">
+              <p>CIID: {identity.ciid}</p>
+              {identity.contentHash && (
+                <p>Content hash: {identity.contentHash.slice(0, 20)}…</p>
+              )}
+              <p className="mt-2 font-sans">
+                <Link href={`/api/v1/identity/${identity.ciid}`} className="hover:underline">
+                  View JSON API
+                </Link>
+                {' · '}
+                <Link href={`/api/v1/verify/${identity.ciid}`} className="hover:underline">
+                  Verify profile
+                </Link>
+              </p>
+            </div>
+          </details>
         </div>
       </main>
     </div>

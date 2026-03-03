@@ -3,7 +3,7 @@
  * Schema is ready; no UI is built for groups at MVP.
  */
 import { TRPCError } from '@trpc/server';
-import { eq, isNull } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { groups, groupMemberships, identities } from '@creativeid/db/schema';
 import { createGroupSchema, addGroupMemberSchema } from '@creativeid/types';
@@ -42,7 +42,7 @@ export const groupRouter = createTRPCRouter({
         })
         .from(groupMemberships)
         .innerJoin(identities, eq(groupMemberships.identityId, identities.id))
-        .where(eq(groupMemberships.groupId, input.groupId));
+        .where(and(eq(groupMemberships.groupId, input.groupId), isNull(identities.deletedAt)));
       return members;
     }),
 
@@ -73,6 +73,9 @@ export const groupRouter = createTRPCRouter({
     .input(addGroupMemberSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.identity) throw new TRPCError({ code: 'NOT_FOUND' });
+      const [group] = await ctx.db.select().from(groups).where(eq(groups.id, input.groupId)).limit(1);
+      if (!group) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (group.createdBy !== ctx.identity.id) throw new TRPCError({ code: 'FORBIDDEN' });
       const [membership] = await ctx.db.insert(groupMemberships).values({
         groupId: input.groupId,
         identityId: input.identityId,
@@ -89,7 +92,10 @@ export const groupRouter = createTRPCRouter({
       if (!group) throw new TRPCError({ code: 'NOT_FOUND' });
       if (group.createdBy !== ctx.identity.id) throw new TRPCError({ code: 'FORBIDDEN' });
       await ctx.db.delete(groupMemberships).where(
-        eq(groupMemberships.groupId, input.groupId),
+        and(
+          eq(groupMemberships.groupId, input.groupId),
+          eq(groupMemberships.identityId, input.identityId),
+        ),
       );
       return { success: true };
     }),

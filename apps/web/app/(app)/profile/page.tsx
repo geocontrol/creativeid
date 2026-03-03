@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DISCIPLINES, type Discipline } from '@creativeid/types';
 import { trpc } from '@/lib/trpc';
+import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,11 +59,13 @@ export default function ProfilePage() {
 
     await utils.identity.me.invalidate();
     setEditing(false);
+    toast({ title: 'Profile saved' });
   };
 
   const publish = async () => {
     await publishMutation.mutateAsync();
     await utils.identity.me.invalidate();
+    toast({ title: 'Profile published', description: 'A verified snapshot has been recorded.' });
   };
 
   const toggleDiscipline = (d: Discipline) => {
@@ -81,9 +84,14 @@ export default function ProfilePage() {
               <Button variant="outline" onClick={startEditing}>
                 Edit
               </Button>
-              <Button onClick={() => void publish()} disabled={publishMutation.isPending}>
-                {publishMutation.isPending ? 'Publishing…' : 'Publish'}
-              </Button>
+              <div className="flex flex-col items-end gap-0.5">
+                <Button onClick={() => void publish()} disabled={publishMutation.isPending}>
+                  {publishMutation.isPending ? 'Publishing…' : 'Publish'}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Locks a verified snapshot of your profile
+                </span>
+              </div>
             </>
           )}
           {editing && (
@@ -130,7 +138,7 @@ export default function ProfilePage() {
                         : 'border-border bg-background hover:bg-accent'
                     }`}
                   >
-                    {d.replace('-', ' ')}
+                    {d.replace(/-/g, ' ')}
                   </button>
                 ))}
               </div>

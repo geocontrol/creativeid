@@ -39,12 +39,28 @@ export default function OnboardingPage() {
 
   const handleStep1 = async () => {
     if (!displayName.trim() || selectedDisciplines.length === 0) return;
-    await createIdentity.mutateAsync({
-      displayName: displayName.trim(),
-      disciplines: selectedDisciplines,
-    });
+    try {
+      await createIdentity.mutateAsync({
+        displayName: displayName.trim(),
+        disciplines: selectedDisciplines,
+      });
+    } catch (err: unknown) {
+      // The Clerk webhook may have already created an identity stub before the user
+      // reached onboarding. If so, update the stub rather than failing.
+      const code = (err as { data?: { code?: string } })?.data?.code;
+      if (code === 'CONFLICT') {
+        await updateIdentity.mutateAsync({
+          displayName: displayName.trim(),
+          disciplines: selectedDisciplines,
+        });
+      } else {
+        throw err;
+      }
+    }
     setStep(2);
   };
+
+  const skipStep2 = () => setStep(3);
 
   const handleStep2 = async () => {
     if (artistStatement || biography) {
@@ -111,7 +127,7 @@ export default function OnboardingPage() {
                       : 'border-border bg-background hover:bg-accent'
                   }`}
                 >
-                  {d.replace('-', ' ')}
+                  {d.replace(/-/g, ' ')}
                 </button>
               ))}
             </div>
@@ -124,6 +140,9 @@ export default function OnboardingPage() {
           >
             {createIdentity.isPending ? 'Saving…' : 'Continue'}
           </Button>
+          {createIdentity.error && (
+            <p className="text-sm text-destructive">{createIdentity.error.message}</p>
+          )}
         </div>
       )}
 
@@ -155,8 +174,8 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => void handleStep2()} className="flex-1">
-              Skip
+            <Button variant="outline" onClick={skipStep2} className="flex-1">
+              Skip for now
             </Button>
             <Button
               onClick={() => void handleStep2()}
@@ -173,14 +192,17 @@ export default function OnboardingPage() {
         <div className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="handle">Claim your handle</Label>
-            <div className="flex items-center gap-1">
-              <span className="text-muted-foreground">creativeid.app/</span>
+            <div className="flex rounded-md shadow-sm">
+              <span className="inline-flex items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+                creativeid.app/
+              </span>
               <Input
                 id="handle"
                 value={handle}
                 onChange={(e) => setHandle(e.target.value.toLowerCase())}
                 placeholder="yourname"
                 pattern="[a-z0-9][a-z0-9\-]{1,28}[a-z0-9]|[a-z0-9]{3}"
+                className="rounded-l-none"
               />
             </div>
             <p className="text-xs text-muted-foreground">

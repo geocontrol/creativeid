@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
 
@@ -13,20 +14,22 @@ interface ProfileCompletenessProps {
   className?: string;
 }
 
+type MissingItem = { label: string; href: string };
+
 function computeCompleteness(identity: ProfileCompletenessProps['identity']): {
   score: number;
-  missing: string[];
+  missing: MissingItem[];
 } {
-  const checks: Array<[boolean, string]> = [
-    [Boolean(identity.displayName), 'Display name'],
-    [Boolean(identity.handle), 'Handle / username'],
-    [Boolean(identity.disciplines?.length), 'At least one discipline'],
-    [Boolean(identity.biography), 'Biography'],
-    [Boolean(identity.avatarUrl), 'Profile photo'],
-    [Boolean(identity.contentHash), 'Published profile'],
+  const checks: Array<[boolean, MissingItem]> = [
+    [Boolean(identity.displayName), { label: 'Display name', href: '/profile' }],
+    [Boolean(identity.handle), { label: 'Claim your handle', href: '/profile' }],
+    [Boolean(identity.disciplines?.length), { label: 'Add a discipline', href: '/profile' }],
+    [Boolean(identity.biography), { label: 'Write a biography', href: '/profile' }],
+    [Boolean(identity.avatarUrl), { label: 'Upload a profile photo', href: '/profile' }],
+    [Boolean(identity.contentHash), { label: 'Publish your profile', href: '/profile' }],
   ];
 
-  const missing = checks.filter(([ok]) => !ok).map(([, label]) => label);
+  const missing = checks.filter(([ok]) => !ok).map(([, item]) => item);
   const score = Math.round(((checks.length - missing.length) / checks.length) * 100);
   return { score, missing };
 }
@@ -44,8 +47,10 @@ export function ProfileCompleteness({ identity, className }: ProfileCompleteness
       {missing.length > 0 && (
         <ul className="mt-3 space-y-1">
           {missing.map((item) => (
-            <li key={item} className="text-xs text-muted-foreground before:mr-1.5 before:content-['·']">
-              {item}
+            <li key={item.label} className="text-xs before:mr-1.5 before:content-['·']">
+              <Link href={item.href} className="text-primary hover:underline">
+                {item.label}
+              </Link>
             </li>
           ))}
         </ul>

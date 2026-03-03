@@ -21,7 +21,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <main className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
+      <main className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <Badge variant="secondary" className="mb-6 text-xs">
           MVP — Early Access
         </Badge>
@@ -67,7 +67,7 @@ export default function LandingPage() {
               },
             ].map(({ step, title, body }) => (
               <div key={step} className="rounded-lg border bg-card p-6">
-                <span className="text-4xl font-black text-primary/20">{step}</span>
+                <span className="text-4xl font-black text-primary/30">{step}</span>
                 <h3 className="mt-2 text-lg font-semibold">{title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{body}</p>
               </div>

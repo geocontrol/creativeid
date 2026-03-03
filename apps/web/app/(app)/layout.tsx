@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { UserButton } from '@clerk/nextjs';
+import { NavLinks } from '@/components/NavLinks';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth();
@@ -15,18 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             creativeId
           </Link>
           <nav className="flex items-center gap-6 text-sm">
-            <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">
-              Dashboard
-            </Link>
-            <Link href="/profile" className="text-muted-foreground hover:text-foreground">
-              My Profile
-            </Link>
-            <Link href="/profile/connections" className="text-muted-foreground hover:text-foreground">
-              Connections
-            </Link>
-            <Link href="/settings" className="text-muted-foreground hover:text-foreground">
-              Settings
-            </Link>
+            <NavLinks />
             <UserButton afterSignOutUrl="/" />
           </nav>
         </div>

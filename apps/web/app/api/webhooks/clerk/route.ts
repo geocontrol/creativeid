@@ -35,7 +35,8 @@ export async function POST(req: Request) {
       'svix-signature': svixSignature,
     }) as WebhookEvent;
   } catch {
-    return new Response('Invalid webhook signature', { status: 400 });
+    // Return a generic 400 without leaking which part of validation failed.
+    return new Response('Bad request', { status: 400 });
   }
 
   // Handle events — DB operations are awaited so that failures return 500

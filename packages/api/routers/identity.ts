@@ -151,7 +151,7 @@ export const identityRouter = createTRPCRouter({
         .limit(1);
 
       if (existing) {
-        throw new TRPCError({ code: 'CONFLICT', message: 'This handle is already taken.' });
+        throw new TRPCError({ code: 'CONFLICT', message: 'Handle unavailable.' });
       }
 
       try {
@@ -166,7 +166,7 @@ export const identityRouter = createTRPCRouter({
         // uniqueness check above; the DB constraint caught it.
         const pgCode = (err as { cause?: { code?: string } })?.cause?.code;
         if (pgCode === '23505') {
-          throw new TRPCError({ code: 'CONFLICT', message: 'This handle is already taken.' });
+          throw new TRPCError({ code: 'CONFLICT', message: 'Handle unavailable.' });
         }
         throw err;
       }

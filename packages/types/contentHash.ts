@@ -10,7 +10,9 @@ export interface PublicIdentityPayload {
 
 /**
  * Generate a SHA-256 content hash for a published identity profile.
- * The hash is deterministic: key order is fixed, no whitespace.
+ * The hash is deterministic: key order is fixed, no whitespace, no runtime
+ * timestamps — the same identity data always produces the same hash, which
+ * is required for the /api/v1/verify/:id endpoint to work correctly.
  * Phase 3 will upgrade to Ed25519 keypair signing.
  */
 export function generateContentHash(identity: PublicIdentityPayload): string {
@@ -21,7 +23,6 @@ export function generateContentHash(identity: PublicIdentityPayload): string {
       disciplines: identity.disciplines ?? [],
       artist_statement: identity.artist_statement ?? null,
       biography: identity.biography ?? null,
-      published_at: new Date().toISOString(),
     },
     null,
     0, // no whitespace — deterministic

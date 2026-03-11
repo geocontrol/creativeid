@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { eq, and, isNull, ne, sql } from 'drizzle-orm';
+import { eq, and, isNull, ne, sql, inArray, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { works, workCredits, identities } from '@creativeid/db/schema';
 import {
@@ -7,6 +7,8 @@ import {
   updateWorkSchema,
   addCreditSchema,
   removeCreditSchema,
+  reorderPhotosSchema,
+  setAsAvatarSchema,
 } from '@creativeid/types';
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc';
 
@@ -39,6 +41,124 @@ export const workRouter = createTRPCRouter({
         );
 
       return workList;
+    }),
+
+  /** Public: list photographs for an identity (by subject_identity_id UUID). */
+  listPhotos: publicProcedure
+    .input(z.object({ identityId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const [identity] = await ctx.db
+        .select({ visibility: identities.visibility, deletedAt: identities.deletedAt })
+        .from(identities)
+        .where(eq(identities.id, input.identityId))
+        .limit(1);
+
+      if (!identity || identity.deletedAt !== null || identity.visibility === 'private') {
+        throw new TRPCError({ code: 'NOT_FOUND' });
+      }
+
+      const photos = await ctx.db
+        .select()
+        .from(works)
+        .where(
+          and(
+            eq(works.subjectIdentityId, input.identityId),
+            eq(works.workType, 'photograph'),
+            isNull(works.deletedAt),
+          ),
+        )
+        .orderBy(asc(works.displayOrder));
+
+      return photos;
+    }),
+
+  /** Mutation: atomically update display_order for all of the caller's photographs. */
+  reorderPhotos: protectedProcedure
+    .input(reorderPhotosSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.identity) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      const { photoIds } = input;
+
+      // Fetch all supplied IDs in one query.
+      const photos = await ctx.db
+        .select({ id: works.id, subjectIdentityId: works.subjectIdentityId })
+        .from(works)
+        .where(and(inArray(works.id, photoIds), isNull(works.deletedAt)));
+
+      // Check for non-existent IDs (atomic: reject all on any failure).
+      if (photos.length !== photoIds.length) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'One or more photo IDs not found.',
+        });
+      }
+
+      // Check all belong to the caller (atomic: reject all on any unauthorised ID).
+      const unauthorised = photos.filter((p) => p.subjectIdentityId !== ctx.identity!.id);
+      if (unauthorised.length > 0) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      // Apply new display_order values.
+      await Promise.all(
+        photoIds.map((id, index) =>
+          ctx.db
+            .update(works)
+            .set({ displayOrder: index, updatedAt: new Date() })
+            .where(eq(works.id, id)),
+        ),
+      );
+
+      return { success: true };
+    }),
+
+  /** Mutation: promote a photograph to the identity's avatar. */
+  setAsAvatar: protectedProcedure
+    .input(setAsAvatarSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.identity) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      const [photo] = await ctx.db
+        .select()
+        .from(works)
+        .where(
+          and(
+            eq(works.id, input.photoId),
+            eq(works.workType, 'photograph'),
+            isNull(works.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!photo) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (photo.subjectIdentityId !== ctx.identity.id) throw new TRPCError({ code: 'FORBIDDEN' });
+
+      // Clear is_avatar on all other photos for this identity.
+      await ctx.db
+        .update(works)
+        .set({ isAvatar: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(works.subjectIdentityId, ctx.identity.id),
+            eq(works.workType, 'photograph'),
+            isNull(works.deletedAt),
+          ),
+        );
+
+      // Set is_avatar on this photo.
+      await ctx.db
+        .update(works)
+        .set({ isAvatar: true, updatedAt: new Date() })
+        .where(eq(works.id, input.photoId));
+
+      // Sync identities.avatar_url.
+      await ctx.db
+        .update(identities)
+        .set({ avatarUrl: photo.coverUrl, updatedAt: new Date() })
+        .where(eq(identities.id, ctx.identity.id));
+
+      return { success: true };
     }),
 
   /** Public: single work with all credits. */

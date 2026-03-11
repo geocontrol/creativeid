@@ -7,10 +7,10 @@ const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 12);
 function getR2Client(): S3Client {
   return new S3Client({
     region: 'auto',
-    endpoint: `https://${process.env['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com`,
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: {
-      accessKeyId: process.env['R2_ACCESS_KEY_ID']!,
-      secretAccessKey: process.env['R2_SECRET_ACCESS_KEY']!,
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
     },
   });
 }
@@ -39,7 +39,7 @@ export async function generatePhotoUploadUrl(
   const client = getR2Client();
   const ext = getExtension(filename);
   const key = `photos/${identityId}/${nanoid()}.${ext}`;
-  const bucket = process.env['R2_BUCKET_NAME']!;
+  const bucket = process.env.R2_BUCKET_NAME!;
 
   const command = new PutObjectCommand({
     Bucket: bucket,
@@ -48,7 +48,7 @@ export async function generatePhotoUploadUrl(
   });
 
   const uploadUrl = await getSignedUrl(client, command, { expiresIn: 300 });
-  const publicUrl = `${process.env['R2_PUBLIC_URL']}/${key}`;
+  const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
 
   return { uploadUrl, key, publicUrl };
 }

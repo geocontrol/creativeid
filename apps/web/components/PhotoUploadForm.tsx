@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 
@@ -129,7 +130,7 @@ export function PhotoUploadForm({ onSuccess, onCancel }: PhotoUploadFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
       {/* Drop zone */}
       <div
         onDrop={handleDrop}
@@ -138,7 +139,9 @@ export function PhotoUploadForm({ onSuccess, onCancel }: PhotoUploadFormProps) {
         className="cursor-pointer rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 p-8 text-center transition hover:border-primary/70"
       >
         {preview ? (
-          <img src={preview} alt="Preview" className="mx-auto max-h-40 rounded object-contain" />
+          <div className="relative mx-auto h-40 w-full">
+            <Image src={preview} alt="Preview" fill className="rounded object-contain" />
+          </div>
         ) : (
           <>
             <p className="font-medium text-primary">Drop photo here or click to browse</p>

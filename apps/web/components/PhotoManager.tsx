@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import Image from 'next/image';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/hooks/use-toast';
 import { PhotoUploadForm } from './PhotoUploadForm';
@@ -44,7 +45,7 @@ function SortablePhotoRow({ photo, onSetAvatar, onDelete }: SortablePhotoRowProp
       <button {...attributes} {...listeners} type="button" className="cursor-grab touch-none text-muted-foreground" aria-label="Drag to reorder">⠿</button>
 
       {photo.coverUrl && (
-        <img src={photo.coverUrl} alt={photo.title} width={40} height={40} className="h-10 w-10 flex-shrink-0 rounded object-cover" />
+        <Image src={photo.coverUrl} alt={photo.title} width={40} height={40} className="h-10 w-10 flex-shrink-0 rounded object-cover" />
       )}
 
       <div className="min-w-0 flex-1">
@@ -139,11 +140,11 @@ export function PhotoManager({ identityId, initialPhotos }: PhotoManagerProps) {
       {photos.length > 0 && (
         <>
           <p className="text-xs text-muted-foreground">Drag to reorder · first photo leads the press section</p>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => { void handleDragEnd(e); }}>
             <SortableContext items={photos.map((p) => p.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
                 {photos.map((photo) => (
-                  <SortablePhotoRow key={photo.id} photo={photo} onSetAvatar={(id) => setAsAvatar.mutate({ photoId: id })} onDelete={handleDelete} />
+                  <SortablePhotoRow key={photo.id} photo={photo} onSetAvatar={(id) => setAsAvatar.mutate({ photoId: id })} onDelete={(id) => { void handleDelete(id); }} />
                 ))}
               </div>
             </SortableContext>

@@ -30,3 +30,6 @@ yarn-error.log*
 # Drizzle
 drizzle/
 .superpowers/
+
+# Git worktrees
+.worktrees/

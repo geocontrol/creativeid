@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@creativeid/db';
 import { identities, works } from '@creativeid/db/schema';
@@ -9,7 +10,7 @@ import { getUploadUrlSchema } from '@creativeid/types';
 const PHOTO_LIMIT = 20;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const { userId } = await auth();
+  const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
   }

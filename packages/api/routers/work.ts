@@ -410,11 +410,17 @@ export const workRouter = createTRPCRouter({
         .limit(1);
 
       if (!work) throw new TRPCError({ code: 'NOT_FOUND' });
-      if (work.createdBy !== ctx.identity.id) throw new TRPCError({ code: 'FORBIDDEN' });
+
+      const isPhoto = work.workType === 'photograph';
+      const ownerId = isPhoto ? work.subjectIdentityId : work.createdBy;
+      if (!ownerId) throw new TRPCError({ code: 'NOT_FOUND' });
+      if (ownerId !== ctx.identity.id) throw new TRPCError({ code: 'FORBIDDEN' });
 
       // Prevent removing the creator's own credit — a work must always have at
-      // least one credited identity.
-      if (credit.identityId === work.createdBy) {
+      // least one credited identity. For non-photographs, createdBy is the creator.
+      // For photographs, there is no concept of "creator credit" — they only have
+      // credits added via work.addCredit. So this check only applies to non-photos.
+      if (!isPhoto && credit.identityId === work.createdBy) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Cannot remove the creator credit. Transfer work ownership first.',

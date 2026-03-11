@@ -13,12 +13,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { WorkCard } from '@/components/WorkCard';
 import { DisciplineBadge } from '@/components/DisciplineBadge';
 import { SignedBadge } from '@/components/SignedBadge';
+import { PhotoManager } from '@/components/PhotoManager';
 
 export default function ProfilePage() {
   const { data: identity, isLoading } = trpc.identity.me.useQuery();
   const { data: worksData } = trpc.work.list.useQuery(
     { identityId: identity?.id ?? '' },
     { enabled: Boolean(identity?.id) },
+  );
+  const { data: photos = [] } = trpc.work.listPhotos.useQuery(
+    { identityId: identity?.id ?? '' },
+    { enabled: !!identity?.id },
   );
 
   const updateMutation = trpc.identity.update.useMutation();
@@ -211,6 +216,13 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Press Photos */}
+      {identity && (
+        <div className="rounded-lg border p-6">
+          <PhotoManager identityId={identity.id} initialPhotos={photos} />
+        </div>
+      )}
     </div>
   );
 }

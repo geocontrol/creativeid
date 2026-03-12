@@ -3,11 +3,14 @@ import { notFound } from 'next/navigation';
 import { type Metadata } from 'next';
 import Link from 'next/link';
 import { db } from '@creativeid/db';
-import { identities, works, connections } from '@creativeid/db/schema';
-import { eq, and, isNull, or, inArray } from 'drizzle-orm';
+import { identities, works, connections, workCredits } from '@creativeid/db/schema';
+import { eq, and, isNull, or, inArray, asc } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { PublicProfileHeader } from '@/components/PublicProfileHeader';
 import { WorkCard } from '@/components/WorkCard';
 import { IdentityCard } from '@/components/IdentityCard';
+import { PressPhotosSection } from '@/components/PressPhotosSection';
+import type { LightboxPhoto } from '@/components/PhotoLightbox';
 
 interface Props {
   params: { handle: string };
@@ -30,13 +33,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const description = identity.artistStatement ?? identity.biography?.slice(0, 160) ?? undefined;
 
+  const [firstPhoto] = await db
+    .select({ coverUrl: works.coverUrl })
+    .from(works)
+    .where(
+      and(
+        eq(works.subjectIdentityId, identity.id),
+        eq(works.workType, 'photograph'),
+        isNull(works.deletedAt),
+      ),
+    )
+    .orderBy(asc(works.displayOrder))
+    .limit(1);
+
+  const ogImages: { url: string }[] = [];
+  if (identity.avatarUrl) ogImages.push({ url: identity.avatarUrl });
+  if (firstPhoto?.coverUrl && firstPhoto.coverUrl !== identity.avatarUrl) {
+    ogImages.push({ url: firstPhoto.coverUrl });
+  }
+
   return {
     title: identity.displayName,
     description,
     openGraph: {
       title: `${identity.displayName} | creativeId`,
       description,
-      images: identity.avatarUrl ? [{ url: identity.avatarUrl }] : [],
+      images: ogImages,
       url: `${process.env['NEXT_PUBLIC_APP_URL']}/${identity.handle}`,
       type: 'profile',
     },
@@ -44,7 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       card: 'summary',
       title: `${identity.displayName} | creativeId`,
       description,
-      images: identity.avatarUrl ? [identity.avatarUrl] : [],
+      images: ogImages.map((i) => i.url),
     },
   };
 }
@@ -77,8 +99,10 @@ export default async function PublicProfilePage({ params }: Props) {
   // 404 for private profiles
   if (identity.visibility === 'private') notFound();
 
-  // Fetch works and connections in parallel — independent queries.
-  const [workList, connectionList] = await Promise.all([
+  const photographerIdentities = alias(identities, 'photographer_identities');
+
+  // Fetch works, connections, and press photos in parallel — independent queries.
+  const [workList, connectionList, rawPhotos] = await Promise.all([
     db
       .select()
       .from(works)
@@ -92,7 +116,43 @@ export default async function PublicProfilePage({ params }: Props) {
           or(eq(connections.fromId, identity.id), eq(connections.toId, identity.id)),
         ),
       ),
+    db
+      .select({
+        id: works.id,
+        title: works.title,
+        coverUrl: works.coverUrl,
+        year: works.year,
+        description: works.description,
+        displayOrder: works.displayOrder,
+        photographerDisplayName: photographerIdentities.displayName,
+        photographerHandle: photographerIdentities.handle,
+        roleNote: workCredits.roleNote,
+      })
+      .from(works)
+      .leftJoin(
+        workCredits,
+        and(eq(workCredits.workId, works.id), eq(workCredits.role, 'photographer')),
+      )
+      .leftJoin(photographerIdentities, eq(workCredits.identityId, photographerIdentities.id))
+      .where(
+        and(
+          eq(works.subjectIdentityId, identity.id),
+          eq(works.workType, 'photograph'),
+          isNull(works.deletedAt),
+        ),
+      )
+      .orderBy(asc(works.displayOrder)),
   ]);
+
+  const photos: LightboxPhoto[] = rawPhotos.map((p) => ({
+    id: p.id,
+    title: p.title,
+    coverUrl: p.coverUrl,
+    year: p.year,
+    description: p.description,
+    photographerName: p.photographerDisplayName ?? p.roleNote ?? null,
+    photographerHandle: p.photographerHandle ?? null,
+  }));
 
   // Get the connected identities (the other side of each connection)
   const connectedIds = connectionList
@@ -174,6 +234,11 @@ export default async function PublicProfilePage({ params }: Props) {
             </div>
           </section>
         )}
+
+        {/* Press Photos */}
+        <div className="mt-10">
+          <PressPhotosSection photos={photos} />
+        </div>
 
         <div className="mt-8">
           <Link

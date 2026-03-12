@@ -42,7 +42,7 @@ export const setHandleSchema = z.object({
 
 // ─── Work schemas ─────────────────────────────────────────────────────────────
 
-export const workTypeValues = ['album', 'film', 'play', 'exhibition', 'book', 'other'] as const;
+export const workTypeValues = ['album', 'film', 'play', 'exhibition', 'book', 'other', 'photograph'] as const;
 export type WorkType = (typeof workTypeValues)[number];
 
 export const createWorkSchema = z.object({
@@ -68,7 +68,7 @@ export const updateWorkSchema = z.object({
 
 export const addCreditSchema = z.object({
   workId: z.string().uuid(),
-  identityId: z.string().uuid(),
+  identityId: z.string().uuid().optional().nullable(), // nullable for off-platform photographers
   role: z.string().min(1).max(100),
   roleNote: z.string().max(200).optional().nullable(),
   creditOrder: z.number().int().min(0).optional(),
@@ -77,6 +77,29 @@ export const addCreditSchema = z.object({
 export const removeCreditSchema = z.object({
   workId: z.string().uuid(),
   creditId: z.string().uuid(),
+});
+
+// ─── Photo / upload schemas ───────────────────────────────────────────────────────
+
+export const getUploadUrlSchema = z.object({
+  filename: z.string().min(1).max(255),
+  contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  fileSize: z.number().int().positive().max(10 * 1024 * 1024), // 10 MB
+});
+
+// Note: photographs are created via the existing createWorkSchema (with workType='photograph').
+// A separate createPhotographSchema is not needed — the router branches on workType server-side.
+
+export const reorderPhotosSchema = z.object({
+  photoIds: z.array(z.string().uuid()).min(1).max(20),
+});
+
+export const setAsAvatarSchema = z.object({
+  photoId: z.string().uuid(),
+});
+
+export const searchIdentitiesSchema = z.object({
+  q: z.string().min(2).max(100),
 });
 
 // ─── Connection schemas ───────────────────────────────────────────────────────

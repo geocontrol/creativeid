@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { eq, and, isNull, ilike, desc } from 'drizzle-orm';
+import { eq, and, isNull, or, ilike } from 'drizzle-orm';
 import { z } from 'zod';
 import { identities } from '@creativeid/db/schema';
 import {
@@ -9,6 +9,7 @@ import {
   generateCiid,
   validateHandle,
   generateContentHash,
+  searchIdentitiesSchema,
 } from '@creativeid/types';
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc';
 
@@ -62,26 +63,32 @@ export const identityRouter = createTRPCRouter({
       return publicIdentity;
     }),
 
-  /** Search identities by display name (ordered by connection_count desc). */
+  /** Public: search identities by handle or display name (for photographer autocomplete). */
   search: publicProcedure
-    .input(z.object({ query: z.string().min(1).max(100) }))
+    .input(searchIdentitiesSchema)
     .query(async ({ ctx, input }) => {
-      // Escape SQL wildcard characters to prevent pattern-based DoS.
-      const escaped = input.query.replace(/[%_\\]/g, '\\$&');
+      const term = `%${input.q}%`;
+
       const results = await ctx.db
-        .select()
+        .select({
+          id: identities.id,
+          handle: identities.handle,
+          displayName: identities.displayName,
+          avatarUrl: identities.avatarUrl,
+        })
         .from(identities)
         .where(
           and(
-            ilike(identities.displayName, `%${escaped}%`),
             isNull(identities.deletedAt),
-            eq(identities.visibility, 'public'),
+            or(
+              ilike(identities.handle, term),
+              ilike(identities.displayName, term),
+            ),
           ),
         )
-        .orderBy(desc(identities.connectionCount))
-        .limit(20);
+        .limit(10);
 
-      return results.map(({ legalName: _l, clerkUserId: _c, ...pub }) => pub);
+      return results;
     }),
 
   /** Mutation: create a new identity record (called after Clerk onboarding step 1). */

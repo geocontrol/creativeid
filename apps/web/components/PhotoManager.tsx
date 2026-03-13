@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -75,6 +75,11 @@ export function PhotoManager({ identityId, initialPhotos }: PhotoManagerProps) {
     [...initialPhotos].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
   );
   const [showUploadForm, setShowUploadForm] = useState(false);
+
+  // Sync local state when the parent re-fetches after upload/delete/reorder.
+  useEffect(() => {
+    setPhotos([...initialPhotos].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)));
+  }, [initialPhotos]);
 
   const utils = trpc.useUtils();
   const setAsAvatar = trpc.work.setAsAvatar.useMutation({

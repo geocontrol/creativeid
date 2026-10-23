@@ -6,6 +6,10 @@
  * - Reserved words blocked
  */
 
+/**
+ * Single-segment paths that are app routes and so can never be handles.
+ * The middleware imports this list too: add every new top-level route here.
+ */
 export const RESERVED_HANDLES = new Set([
   'api',
   'admin',
@@ -19,6 +23,8 @@ export const RESERVED_HANDLES = new Set([
   'pricing',
   'blog',
   'legal',
+  'profile', // app/(app)/profile
+  'work', // app/work/[id]
 ]);
 
 export const HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$|^[a-z0-9]{3}$/;

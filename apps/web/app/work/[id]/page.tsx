@@ -9,7 +9,7 @@ import { IdentityCard } from '@/components/IdentityCard';
 import { type WorkType } from '@creativeid/types';
 
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 const workTypeLabels: Record<WorkType, string> = {
@@ -31,7 +31,7 @@ async function getWork(id: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const work = await getWork(params.id);
+  const work = await getWork((await params).id);
   if (!work) return { title: 'Work not found' };
   return {
     title: work.title,
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function WorkDetailPage({ params }: Props) {
-  const work = await getWork(params.id);
+  const work = await getWork((await params).id);
   if (!work) notFound();
 
   const credits = await db

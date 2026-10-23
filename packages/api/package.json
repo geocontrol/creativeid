@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clerk/nextjs": "^5.2.0",
+    "@clerk/nextjs": "^6.39.8",
     "@creativeid/db": "workspace:*",
     "@creativeid/types": "workspace:*",
     "@trpc/server": "^11.0.0",
@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "@creativeid/tsconfig": "workspace:*",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
     "typescript": "^5.4.5"
   }
 }

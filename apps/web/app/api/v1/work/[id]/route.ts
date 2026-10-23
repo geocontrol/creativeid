@@ -7,15 +7,16 @@ import { apiResponse, apiError } from '@/lib/apiResponse';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const rateLimitResult = await checkRateLimit(req);
   if (!rateLimitResult.success) return rateLimitResult.response;
 
+  const { id } = await params;
   const [work] = await db
     .select()
     .from(works)
-    .where(and(eq(works.id, params.id), isNull(works.deletedAt)))
+    .where(and(eq(works.id, id), isNull(works.deletedAt)))
     .limit(1);
 
   if (!work) return apiError('Work not found', 404);

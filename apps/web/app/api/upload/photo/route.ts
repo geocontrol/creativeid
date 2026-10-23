@@ -10,7 +10,7 @@ import { getUploadUrlSchema } from '@creativeid/types';
 const PHOTO_LIMIT = 20;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
   }

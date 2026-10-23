@@ -417,7 +417,7 @@ Route: `apps/web/app/[handle]/page.tsx`
 - 3–30 characters
 - Lowercase alphanumeric + hyphens only
 - Cannot start or end with a hyphen
-- Reserved words blocked: `api`, `admin`, `dashboard`, `settings`, `onboarding`,
+- Reserved words blocked (source of truth: `packages/types/handle.ts`, also used by the middleware): `api`, `admin`, `dashboard`, `settings`, `onboarding`, `profile`, `work`,
   `sign-in`, `sign-up`, `help`, `about`, `pricing`, `blog`, `legal`
 
 ---

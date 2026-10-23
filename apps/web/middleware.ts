@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { RESERVED_HANDLES } from '@creativeid/types/handle';
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
@@ -38,11 +39,9 @@ const isPublicRoute = createRouteMatcher([
   '/:handle', // public profile pages
 ]);
 
-// Paths that are app routes, never user handles. Mirrors CLAUDE.md reserved list.
-const RESERVED_PATHS = new Set([
-  'api', 'admin', 'dashboard', 'settings', 'onboarding',
-  'sign-in', 'sign-up', 'help', 'about', 'pricing', 'blog', 'legal',
-]);
+// Paths that are app routes, never user handles: the same list handle
+// validation uses, so the two cannot drift apart.
+const RESERVED_PATHS = RESERVED_HANDLES;
 
 /**
  * If the request is for a single-segment path that could be a user handle,

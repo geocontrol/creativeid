@@ -8,12 +8,12 @@ import { apiError } from '@/lib/apiResponse';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const rateLimitResult = await checkRateLimit(req);
   if (!rateLimitResult.success) return rateLimitResult.response;
 
-  const { id } = params;
+  const { id } = await params;
   const isCiid = id.startsWith('ciid_');
 
   const [identity] = await db

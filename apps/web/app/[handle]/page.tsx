@@ -13,7 +13,7 @@ import { PressPhotosSection } from '@/components/PressPhotosSection';
 import type { LightboxPhoto } from '@/components/PhotoLightbox';
 
 interface Props {
-  params: { handle: string };
+  params: Promise<{ handle: string }>;
 }
 
 // cache() deduplicates calls within the same request — generateMetadata and the
@@ -28,7 +28,7 @@ const getIdentity = cache(async (handle: string) => {
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const identity = await getIdentity(params.handle);
+  const identity = await getIdentity((await params).handle);
   if (!identity || identity.deletedAt) return { title: 'Not found' };
 
   const description = identity.artistStatement ?? identity.biography?.slice(0, 160) ?? undefined;
@@ -72,7 +72,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicProfilePage({ params }: Props) {
-  const identity = await getIdentity(params.handle);
+  const identity = await getIdentity((await params).handle);
 
   // Handle not found — no identity with this handle at all
   if (!identity) notFound();

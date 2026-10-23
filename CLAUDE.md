@@ -30,7 +30,7 @@ creativeid/
 ├── .env.example               ← all required env vars documented here
 │
 ├── apps/
-│   └── web/                   ← Next.js 14 frontend + API routes
+│   └── web/                   ← Next.js 15 frontend + API routes
 │       ├── app/               ← App Router pages and layouts
 │       │   ├── (marketing)/   ← public marketing pages
 │       │   ├── (auth)/        ← sign-in, sign-up flows
@@ -64,13 +64,13 @@ creativeid/
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Framework | **Next.js 14** (App Router) | Use server components by default; client components only when needed |
+| Framework | **Next.js 15** (App Router), **React 19** | Use server components by default; client components only when needed. `params`, `cookies()`, `headers()` and Clerk `auth()` are async: always `await` them |
 | Language | **TypeScript** (strict mode) | No `any`. Use Zod for all runtime validation |
 | Styling | **Tailwind CSS** + **shadcn/ui** | Install components via `npx shadcn@latest add`. Do not write raw CSS |
 | API | **tRPC v11** | End-to-end type safety. All data mutations go through tRPC |
 | ORM | **Drizzle ORM** | Schema-first. Generate migrations, do not hand-write SQL |
 | Database | **PostgreSQL** (via **Neon** serverless) | Use JSONB for extension module fields |
-| Auth | **Clerk** | Magic link + social OAuth (Google, Apple). Do not implement custom auth |
+| Auth | **Clerk** (`@clerk/nextjs` v6) | Magic link + social OAuth (Google, Apple). Do not implement custom auth |
 | File storage | **Cloudflare R2** | Avatars and media. Use the S3-compatible SDK |
 | Email | **Resend** + **React Email** | Transactional only at MVP |
 | Package manager | **pnpm** | Always use pnpm, not npm or yarn |
@@ -646,6 +646,7 @@ understand the reasoning.
 | 2026-03 | `clerk_user_id` not UNIQUE in DB | Enables multi-identity per account post-MVP without a breaking migration |
 | 2026-03 | Handles first-come-first-served, no dispute form | Dispute forms generate support overhead; web-of-trust + connection count is the disambiguation mechanism |
 | 2026-03 | Reactive moderation only | Creators are self-motivated to maintain accurate bios; low expected volume at MVP |
+| 2026-10 | Next.js 14 → 15.5, React 19, Clerk v6 | Next 14 has no fix for critical 2026 advisories (unauthenticated RCE in Image Optimization). React is pinned workspace-wide via `pnpm.overrides` so drizzle-orm resolves to a single instance |
 
 ---
 
